@@ -19,6 +19,7 @@ public @interface LuckVerify {
      * 为当前路由以下的所有子路由赋予相同验证要求
       */
     boolean children() default false;
-    RequestMethod[] value() default {};
+    String value() default "无描述";
+    RequestMethod[] method() default {};
     boolean ignore() default false;
 }

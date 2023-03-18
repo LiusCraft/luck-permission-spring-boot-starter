@@ -1,10 +1,13 @@
 package com.liuscraft.luckpermission.config;
 
-import com.liuscraft.luckpermission.LuckPermission;
+import com.liuscraft.luckpermission.LuckPermissionBuilder;
+import com.liuscraft.luckpermission.entity.LuckAuthority;
 import com.liuscraft.luckpermission.entity.LuckVerifyEntity;
-import com.liuscraft.luckpermission.interceptors.VerifyInterceptor;
+import com.liuscraft.luckpermission.interceptors.LuckVerifyInterceptor;
+import com.liuscraft.luckpermission.properties.LuckProperties;
+import com.liuscraft.luckpermission.service.LuckAuthorityService;
+import com.liuscraft.luckpermission.service.LuckGetUserInfoService;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.ModelAndView;
@@ -14,7 +17,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -23,23 +26,32 @@ import java.util.Map;
  * @author LiusCraft
  * @date 2023/3/5 21:23
  */
-@Configuration()
+@Configuration
 public class LuckPermissionWebMvcConfig implements WebMvcConfigurer {
 
     @Resource
-    private LuckProperties luckProperties;
+    private LuckPermissionBuilder luckPermissionBuilder;
 
-    static final List<VerifyInterceptor> verifyInterceptors = new LinkedList<>();
+    @Resource
+    LuckAuthorityService luckAuthorityService;
+    @Resource
+    LuckGetUserInfoService luckGetUserInfoService;
+    @Resource
+    LuckProperties luckProperties;
+
+    static final List<LuckVerifyInterceptor> LUCK_VERIFY_INTERCEPTORS = new LinkedList<>();
     
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        if (luckPermissionBuilder.getRoutePaths().size()==0) return;
+        System.out.println("[LuckPermission] 正在注册Luck拦截器");
         Class[] verifyInterceptors = luckProperties.getVerifyInterceptors();
-        System.out.println("正在注册Luck拦截器");
         if (verifyInterceptors.length == 0) return;
-        List<VerifyInterceptor> finalVerifyInterceptorList = new LinkedList<>();
+        List<LuckVerifyInterceptor> finalLuckVerifyInterceptorList = new LinkedList<>();
         for (Class verifyInterceptor : verifyInterceptors) {
+            System.out.println("正在拦截器:"+verifyInterceptor.getName());
             try {
-                finalVerifyInterceptorList.add((VerifyInterceptor) verifyInterceptor.newInstance());
+                finalLuckVerifyInterceptorList.add((LuckVerifyInterceptor) verifyInterceptor.newInstance());
             } catch (InstantiationException e) {
                 throw new RuntimeException(e);
             } catch (IllegalAccessException e) {
@@ -48,21 +60,27 @@ public class LuckPermissionWebMvcConfig implements WebMvcConfigurer {
         }
         try {
             registry.addInterceptor(new HandlerInterceptor() {
-                List<VerifyInterceptor> verifyInterceptorList = finalVerifyInterceptorList;
+                List<LuckVerifyInterceptor> luckVerifyInterceptorList = finalLuckVerifyInterceptorList;
                 private LuckVerifyEntity getLuckVerifyEntity(HttpServletRequest request){
                     String currentRoute = request.getServletPath();
                     Map pathVariables = (Map) request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
                     if (pathVariables!=null)
-                        currentRoute = LuckPermission.routePathConver(pathVariables, currentRoute);
-                    return LuckPermission.getCurrentLoginVerify(request.getMethod(), currentRoute);
+                        currentRoute = luckPermissionBuilder.routePathConver(pathVariables, currentRoute);
+                    return luckPermissionBuilder.getCurrentLoginVerify(request.getMethod(), currentRoute);
 
                 }
                 @Override
                 public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
                     LuckVerifyEntity luckVerifyEntity = getLuckVerifyEntity(request);
                     if (luckVerifyEntity == null) return false;
-                    for (VerifyInterceptor verifyInterceptor : verifyInterceptorList) {
-                        return verifyInterceptor.preHandle(request, response, handler, luckVerifyEntity);
+                    if (luckVerifyEntity.getIgnore()) return true;
+                    LuckAuthority userAuthorization = luckAuthorityService.getUserAuthorization(luckGetUserInfoService.getUserId(request));
+                    if (userAuthorization == null) {
+                        System.out.println("无法正确获取到userAuthorization！");
+                    }
+                    for (LuckVerifyInterceptor luckVerifyInterceptor : luckVerifyInterceptorList) {
+                        if(!luckVerifyInterceptor.preHandle(request, response, handler, luckVerifyEntity, userAuthorization))
+                            return false;
                     }
                     return HandlerInterceptor.super.preHandle(request, response, handler);
                 }
@@ -76,7 +94,7 @@ public class LuckPermissionWebMvcConfig implements WebMvcConfigurer {
                 public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
                     HandlerInterceptor.super.afterCompletion(request, response, handler, ex);
                 }
-            }).addPathPatterns(LuckPermission.getRoutes());
+            }).addPathPatterns(new ArrayList<>(luckPermissionBuilder.getRoutePaths()));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

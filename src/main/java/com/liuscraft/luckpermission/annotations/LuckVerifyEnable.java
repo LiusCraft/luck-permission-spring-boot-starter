@@ -1,10 +1,8 @@
 package com.liuscraft.luckpermission.annotations;
 
-import com.liuscraft.luckpermission.LuckPermission;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.ComponentScans;
+import com.liuscraft.luckpermission.LuckPermissionEnable;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.annotation.AliasFor;
+import org.springframework.context.annotation.Lazy;
 
 import java.lang.annotation.*;
 
@@ -15,6 +13,6 @@ import java.lang.annotation.*;
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@Import(LuckPermission.class)
+@Import(LuckPermissionEnable.class)
 public @interface LuckVerifyEnable {
 }

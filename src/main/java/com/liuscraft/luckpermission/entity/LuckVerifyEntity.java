@@ -4,6 +4,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -13,32 +14,57 @@ import java.util.Set;
 public class LuckVerifyEntity {
     private String route;
     private String[] routes;
-    private Set<RequestMethod> requestMethods;
+    private String description;
+    private String requestMethod;
+    private Boolean ignore = false;
     private List<String> pathVariables = new ArrayList<>();
 
-    public LuckVerifyEntity(String route, Set<RequestMethod> requestMethods) {
+    public LuckVerifyEntity(String route, RequestMethod requestMethod) {
         initRoute(route);
-        this.requestMethods = requestMethods;
+        if (requestMethod == null) this.requestMethod = "all";
+        else this.requestMethod = requestMethod.name();
     }
 
-    public List<String> getPathVariables() {
+    public LuckVerifyEntity(String route, String requestMethod) {
+        initRoute(route);
+        if (requestMethod == null) this.requestMethod = "all";
+        else this.requestMethod = requestMethod;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public void setIgnore() {
+        this.ignore = true;
+    }
+
+    public Boolean getIgnore() {
+        return ignore;
+    }
+
+    private List<String> getPathVariables() {
         return pathVariables;
     }
 
-    public Set<RequestMethod> getRequestMethods() {
-        return requestMethods;
+    public String getRequestMethod() {
+        return requestMethod;
     }
 
     public String getRoute() {
         return route;
     }
 
-    public String[] getRoutes() {
-        return routes;
+    public String getMethodRoute() {
+        return getRequestMethod()+":"+getRoute();
     }
 
-    public void addMethods(Set<RequestMethod> requestMethods) {
-        this.requestMethods.addAll(requestMethods);
+    private String[] getRoutes() {
+        return routes;
     }
 
     private void initRoute(String route) {
@@ -52,20 +78,20 @@ public class LuckVerifyEntity {
 
     public boolean checkRoute(String route){
 
-        if (pathVariables.size()>0) {
+        if (getPathVariables().size()>0) {
             String[] targets = route.split("/");
-            if (targets.length != this.routes.length) return false;
+            if (targets.length != getRoutes().length) return false;
             int len = 0;
             for (int i = 0; i < targets.length; i++) {
-                if (this.pathVariables.contains(this.routes[i])) {
+                if (getPathVariables().contains(getRoutes()[i])) {
                     len++;
-                    if (len>this.pathVariables.size()) return false;
+                    if (len>getPathVariables().size()) return false;
                     continue;
                 }
-                if(!targets[i].equals(this.routes[i])) return false;
+                if(!targets[i].equals(getRoutes()[i])) return false;
             }
             return true;
-        }else return this.route.equalsIgnoreCase(route);
+        }else return getRoute().equalsIgnoreCase(route);
 
     }
 
@@ -75,9 +101,35 @@ public class LuckVerifyEntity {
      * @return true支持 or false不支持
      */
     public boolean checkMethod(String method) {
-        for (RequestMethod requestMethod : requestMethods) {
-            if (requestMethod.name().equalsIgnoreCase(method)) return true;
+        return getRequestMethod().equalsIgnoreCase(method);
+    }
+
+    public boolean checkPermission(LuckPermission luckPermission) {
+        return luckPermission.getMethodRoute().equalsIgnoreCase(this.getMethodRoute());
+    }
+
+    public boolean checkPermissions(List<LuckPermission> luckPermissions) {
+        for (LuckPermission luckPermission : luckPermissions) {
+            if (checkPermission(luckPermission)) return true;
         }
         return false;
+    }
+
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null) return false;
+        return getMethodRoute().equalsIgnoreCase(o.toString());
+    }
+
+    @Override
+    public String toString() {
+        return getMethodRoute();
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getRequestMethod(), getRoute());
     }
 }
