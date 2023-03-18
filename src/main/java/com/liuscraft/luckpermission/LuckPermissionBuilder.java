@@ -121,7 +121,7 @@ public class LuckPermissionBuilder {
      */
     public List<LuckVerifyEntity> getAllPath(Annotation[] annotations, String root) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         List<LuckVerifyEntity> result = new LinkedList<>();
-        String finalRoot = (root==null?"/":root.charAt(0) == '/'?root:root+"/");
+        String finalRoot = (root==null?"/":root.charAt(0) == '/'?root+"/":"/"+root+"/");
         for (Annotation annotation : annotations) {
             RequestMapping action = null;
             if (annotation.annotationType() == RequestMapping.class || (action = annotation.annotationType().getAnnotation(RequestMapping.class)) != null){
@@ -138,8 +138,9 @@ public class LuckPermissionBuilder {
                     paths.add(finalRoot);
                 }else {
                     paths = paths.stream().map(v-> {
-                        if (v.charAt(0) == '/' && finalRoot.equals("/")) return v;
-                        else return finalRoot + v;
+                        if (v.charAt(0) == '/' )
+                            v = v.substring(1, v.length());
+                        return finalRoot + v;
                     }).collect(Collectors.toList());
                 }
                 for (String path : paths) {
